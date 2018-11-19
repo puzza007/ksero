@@ -1,7 +1,11 @@
 extern crate clap;
 
 use clap::App;
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
+
+fn is_empty(entry: &DirEntry) -> bool {
+    entry.metadata().map(|m| m.len() == 0).unwrap_or(false)
+}
 
 fn main() {
     let matches = App::new("Ksero")
@@ -13,7 +17,11 @@ fn main() {
 
     if let Some(directories) = matches.values_of("directories") {
         for d in directories.into_iter() {
-            for entry in WalkDir::new(d).into_iter().filter_map(|e| e.ok()) {
+            for entry in WalkDir::new(d)
+                .into_iter()
+                .filter_entry(|e| !is_empty(e))
+                .filter_map(|e| e.ok())
+            {
                 println!("{}", entry.path().display());
             }
         }
