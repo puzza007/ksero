@@ -42,18 +42,20 @@ fn main() {
         }
     }
 
-    // Find file with duplicate crc32 of first N bytes
-    let mut files_by_crc32_chunk = HashMap::new();
+    // Find file with duplicate hash of first N bytes
+    let mut files_by_hash_chunk = HashMap::new();
 
-    let mut files_by_crc32_chunk_work = Vec::new();
+    let mut files_by_hash_chunk_work = Vec::with_capacity(50000);
 
-    for (_k, v) in files_by_size.iter().filter(|&(_k, v)| v.len() > 1) {
-        for entry in v.iter() {
-            files_by_crc32_chunk_work.push(entry);
+    for (_k, v) in files_by_size.iter() {
+        if v.len() > 1 {
+            for entry in v.iter() {
+                files_by_hash_chunk_work.push(entry);
+            }
         }
     }
 
-    let results: Vec<(u64, String)> = files_by_crc32_chunk_work.par_iter().map(|entry| {
+    let results: Vec<(u64, String)> = files_by_hash_chunk_work.par_iter().map(|entry| {
         let mut digest = twox_hash::XxHash::with_seed(0);
         let mut f = match File::open(entry.path()) {
             Ok(f) => f,
@@ -75,21 +77,23 @@ fn main() {
     }).collect();
 
     for (digest_sum, path) in results.iter() {
-        files_by_crc32_chunk.entry(digest_sum).or_insert_with(Vec::new).push(path);
+        files_by_hash_chunk.entry(digest_sum).or_insert_with(Vec::new).push(path);
     }
 
-    let mut files_by_crc32 = HashMap::new();
+    let mut files_by_hash = HashMap::new();
 
-    let mut files_by_crc32_work = Vec::new();
+    let mut files_by_hash_work = Vec::with_capacity(50000);
 
     // Now go the whole hog and checksum the entire file
-    for (_k, v) in files_by_crc32_chunk.iter().filter(|&(_k, v)| v.len() > 1) {
-        for path in v.iter() {
-            files_by_crc32_work.push(path);
+    for (_k, v) in files_by_hash_chunk.iter() {
+        if v.len() > 1 {
+            for path in v.iter() {
+                files_by_hash_work.push(path);
+            }
         }
     }
 
-    let final_results: Vec<(u64, String)> = files_by_crc32_work.par_iter().map(|path| {
+    let final_results: Vec<(u64, String)> = files_by_hash_work.par_iter().map(|path| {
         let mut digest = twox_hash::XxHash::with_seed(0);
         let mut f = match File::open(path) {
             Ok(f) => f,
@@ -115,10 +119,12 @@ fn main() {
     }).collect();
 
     for (digest_sum, path) in final_results.iter() {
-        files_by_crc32.entry(digest_sum).or_insert_with(Vec::new).push(path);
+        files_by_hash.entry(digest_sum).or_insert_with(Vec::new).push(path);
     }
 
-    for (k, v) in files_by_crc32.iter().filter(|(_k, v)| v.len() > 1) {
-        println!("{}: {:?}", k, v);
+    for (k, v) in files_by_hash.iter() {
+        if v.len() > 1 {
+            println!("{}: {:?}", k, v);
+        }
     }
 }

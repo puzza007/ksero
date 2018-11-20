@@ -7,6 +7,5 @@ edition = "2018"
 [dependencies]
 clap = "2.32.0"
 walkdir = "2.2.7"
-crc = "^1.0.0"
 rayon = "1.0.3"
 twox-hash = "1.1.1"
