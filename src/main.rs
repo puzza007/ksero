@@ -60,7 +60,7 @@ fn main() {
                 panic!("Failed to open file: {}", e.description());
             }
         };
-        const CHUNK_SIZE: usize = 1024 * 128;
+        const CHUNK_SIZE: usize = 1024;
         let mut buffer = [0; CHUNK_SIZE];
 
         match f.read(&mut buffer) {
