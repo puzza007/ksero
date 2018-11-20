@@ -14,6 +14,12 @@ use walkdir::{DirEntry, WalkDir};
 
 struct HashWriter<T: Hasher>(T);
 
+impl<T: Hasher> HashWriter<T> {
+    fn finish(&self) -> u64 {
+        self.0.finish()
+    }
+}
+
 impl<T: Hasher> io::Write for HashWriter<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.0.write(buf);
@@ -132,14 +138,13 @@ fn main() {
     let final_results: Vec<(u64, String)> = files_by_hash_work
         .par_iter()
         .filter_map(|path| {
-            let digest = twox_hash::XxHash::with_seed(0);
-            let mut digest_writer = HashWriter(digest);
+            let mut digest_writer = HashWriter(twox_hash::XxHash::with_seed(0));
             match File::open(path) {
                 Err(_) => None,
                 Ok(mut f) => {
                     match std::io::copy(&mut f, &mut digest_writer) {
                         Ok(_) => {
-                            let digest_sum = digest.finish();
+                            let digest_sum = digest_writer.finish();
                             Some((digest_sum, path.to_string()))
                         },
                         Err(_) =>
