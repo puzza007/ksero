@@ -7,9 +7,27 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::hash::Hasher;
 use std::io::Read;
+use std::io;
 use std::time::{SystemTime, UNIX_EPOCH};
 use twox_hash;
 use walkdir::{DirEntry, WalkDir};
+
+struct HashWriter<T: Hasher>(T);
+
+impl<T: Hasher> io::Write for HashWriter<T> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.write(buf);
+        Ok(buf.len())
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.write(buf).map(|_| ())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 fn is_empty(entry: &DirEntry) -> bool {
     entry.metadata().map(|m| m.len() == 0).unwrap_or(false)
@@ -114,24 +132,13 @@ fn main() {
     let final_results: Vec<(u64, String)> = files_by_hash_work
         .par_iter()
         .filter_map(|path| {
-            let mut digest = twox_hash::XxHash::with_seed(0);
+            let digest = twox_hash::XxHash::with_seed(0);
+            let mut digest_writer = HashWriter(digest);
             match File::open(path) {
                 Err(_) => None,
                 Ok(mut f) => {
-                    const CHUNK_SIZE: usize = 1024 * 128;
-                    let mut buffer = [0; CHUNK_SIZE];
-
-                    // iterate
-                    loop {
-                        match f.read(&mut buffer) {
-                            Err(_) => return None,
-                            Ok(0) => break,
-                            Ok(n) => digest.write(&buffer[0..n]),
-                        }
-                    }
-
+                    std::io::copy(&mut f, &mut digest_writer).unwrap();
                     let digest_sum = digest.finish();
-
                     Some((digest_sum, path.to_string()))
                 }
             }
