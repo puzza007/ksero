@@ -2,12 +2,13 @@ extern crate clap;
 
 use clap::App;
 use walkdir::{DirEntry, WalkDir};
-use crc::{crc32, Hasher32};
 use std::fs::File;
 use std::io::Read;
 use std::error::Error;
 use std::collections::HashMap;
 use rayon::prelude::*;
+use twox_hash;
+use std::hash::Hasher;
 
 fn is_empty(entry: &DirEntry) -> bool {
     entry.metadata().map(|m| m.len() == 0).unwrap_or(false)
@@ -52,8 +53,8 @@ fn main() {
         }
     }
 
-    let results: Vec<(u32, String)> = files_by_crc32_chunk_work.par_iter().map(|entry| {
-        let mut digest = crc32::Digest::new(crc32::IEEE);
+    let results: Vec<(u64, String)> = files_by_crc32_chunk_work.par_iter().map(|entry| {
+        let mut digest = twox_hash::XxHash::with_seed(0);
         let mut f = match File::open(entry.path()) {
             Ok(f) => f,
             Err(e) => {
@@ -68,7 +69,7 @@ fn main() {
             Ok(n) => digest.write(&buffer[0..n])
         }
 
-        let digest_sum = digest.sum32();
+        let digest_sum = digest.finish();
 
         (digest_sum, entry.path().to_str().unwrap().to_string())
     }).collect();
@@ -88,8 +89,8 @@ fn main() {
         }
     }
 
-    let final_results: Vec<(u32, String)> = files_by_crc32_work.par_iter().map(|path| {
-        let mut digest = crc32::Digest::new(crc32::IEEE);
+    let final_results: Vec<(u64, String)> = files_by_crc32_work.par_iter().map(|path| {
+        let mut digest = twox_hash::XxHash::with_seed(0);
         let mut f = match File::open(path) {
             Ok(f) => f,
             Err(e) => {
@@ -108,7 +109,7 @@ fn main() {
             }
         }
 
-        let digest_sum = digest.sum32();
+        let digest_sum = digest.finish();
 
         (digest_sum, path.to_string())
     }).collect();
@@ -117,7 +118,7 @@ fn main() {
         files_by_crc32.entry(digest_sum).or_insert_with(Vec::new).push(path);
     }
 
-    for (k, v) in files_by_crc32.iter().filter(|&(_k, v)| v.len() > 1) {
+    for (k, v) in files_by_crc32.iter().filter(|(_k, v)| v.len() > 1) {
         println!("{}: {:?}", k, v);
     }
 }
