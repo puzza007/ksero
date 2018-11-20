@@ -1,3 +1,4 @@
+#![feature(duration_as_u128)]
 extern crate clap;
 
 use clap::App;
@@ -6,6 +7,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::hash::Hasher;
 use std::io::Read;
+use std::time::{SystemTime, UNIX_EPOCH};
 use twox_hash;
 use walkdir::{DirEntry, WalkDir};
 
@@ -14,6 +16,8 @@ fn is_empty(entry: &DirEntry) -> bool {
 }
 
 fn main() {
+    let start = SystemTime::now();
+
     let mut files_by_size = HashMap::new();
 
     let matches = App::new("Ksero")
@@ -22,6 +26,8 @@ fn main() {
         .about("Duplicate File Finder")
         .args_from_usage("--directories=<DIRECTORY>... 'Sets directories to search'")
         .get_matches();
+
+    let mut files_considered = 0;
 
     // Find files of duplicate size
     if let Some(directories) = matches.values_of("directories") {
@@ -32,6 +38,7 @@ fn main() {
                 .filter_map(|e| e.ok())
             {
                 if entry.file_type().is_file() {
+                    files_considered = files_considered + 1;
                     let file_size = entry.metadata().unwrap().len();
                     files_by_size
                         .entry(file_size)
@@ -90,14 +97,19 @@ fn main() {
 
     let mut files_by_hash_work = Vec::with_capacity(50000);
 
+    let mut files_nibbled = 0;
+
     // Now go the whole hog and checksum the entire file
     for (_k, v) in files_by_hash_chunk.iter() {
+        files_nibbled = files_nibbled + v.len();
         if v.len() > 1 {
             for path in v.iter() {
                 files_by_hash_work.push(path);
             }
         }
     }
+
+    let mut files_hashed = 0;
 
     let final_results: Vec<(u64, String)> = files_by_hash_work
         .par_iter()
@@ -133,9 +145,28 @@ fn main() {
             .push(path);
     }
 
+    let duration = (SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
+        - start.duration_since(UNIX_EPOCH).unwrap().as_millis())
+        as f64 / 1000.0;
+
     for (k, v) in files_by_hash.iter() {
+        files_hashed = files_hashed + v.len();
         if v.len() > 1 {
-            println!("{}: {:?}", k, v);
+            println!("{} {}", k, v.len());
+            for path in v {
+                println!("\t\"{}\"", path);
+            }
         }
     }
+
+    let files_skipped_due_to_size = files_considered - files_nibbled;
+
+    eprintln!("Time                       : {:.4} seconds", duration);
+    eprintln!("Considered                 : {}", files_considered);
+    eprintln!("Nibbled                    : {}", files_nibbled);
+    eprintln!("Hashed                     : {}", files_hashed);
+    eprintln!("Skipped due to unique size : {}", files_skipped_due_to_size);
 }
