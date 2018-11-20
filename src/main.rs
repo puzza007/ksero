@@ -137,9 +137,14 @@ fn main() {
             match File::open(path) {
                 Err(_) => None,
                 Ok(mut f) => {
-                    std::io::copy(&mut f, &mut digest_writer).unwrap();
-                    let digest_sum = digest.finish();
-                    Some((digest_sum, path.to_string()))
+                    match std::io::copy(&mut f, &mut digest_writer) {
+                        Ok(_) => {
+                            let digest_sum = digest.finish();
+                            Some((digest_sum, path.to_string()))
+                        },
+                        Err(_) =>
+                            None
+                    }
                 }
             }
         })
