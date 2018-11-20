@@ -18,7 +18,7 @@ fn is_empty(entry: &DirEntry) -> bool {
 fn main() {
     let start = SystemTime::now();
 
-    let mut files_by_size = HashMap::new();
+    let mut files_by_size = HashMap::with_capacity(50000);
 
     let matches = App::new("Ksero")
         .version("0.1.0")
@@ -50,7 +50,7 @@ fn main() {
     }
 
     // Find file with duplicate hash of first N bytes
-    let mut files_by_hash_chunk = HashMap::new();
+    let mut files_by_hash_chunk = HashMap::with_capacity(25000);
 
     let mut files_by_hash_chunk_work = Vec::with_capacity(50000);
 
@@ -93,7 +93,7 @@ fn main() {
             .push(path);
     }
 
-    let mut files_by_hash = HashMap::new();
+    let mut files_by_hash = HashMap::with_capacity(10000);
 
     let mut files_by_hash_work = Vec::with_capacity(50000);
 
