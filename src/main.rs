@@ -27,7 +27,6 @@ fn main() {
     if let Some(directories) = matches.values_of("directories") {
         for d in directories.into_iter() {
             for entry in WalkDir::new(d)
-                .follow_links(true)
                 .into_iter()
                 .filter_entry(|e| !is_empty(e))
                 .filter_map(|e| e.ok())
