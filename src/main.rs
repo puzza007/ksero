@@ -38,7 +38,7 @@ fn main() {
                 .filter_map(|e| e.ok())
             {
                 if entry.file_type().is_file() {
-                    files_considered = files_considered + 1;
+                    files_considered += 1;
                     let file_size = entry.metadata().unwrap().len();
                     files_by_size
                         .entry(file_size)
@@ -101,7 +101,7 @@ fn main() {
 
     // Now go the whole hog and checksum the entire file
     for (_k, v) in files_by_hash_chunk.iter() {
-        files_nibbled = files_nibbled + v.len();
+        files_nibbled += v.len();
         if v.len() > 1 {
             for path in v.iter() {
                 files_by_hash_work.push(path);
@@ -153,7 +153,7 @@ fn main() {
         as f64 / 1000.0;
 
     for (k, v) in files_by_hash.iter() {
-        files_hashed = files_hashed + v.len();
+        files_hashed += v.len();
         if v.len() > 1 {
             println!("{} {}", k, v.len());
             for path in v {
