@@ -43,9 +43,9 @@ fn main() {
     }
 
     // Find file with duplicate hash of first N bytes
-    let mut files_by_hash_chunk = HashMap::with_capacity(1000);
+    let mut files_by_hash_chunk = HashMap::new();
 
-    let mut files_by_hash_chunk_work = Vec::with_capacity(5000);
+    let mut files_by_hash_chunk_work = Vec::with_capacity(50000);
 
     for (_k, v) in files_by_size.iter() {
         if v.len() > 1 {
@@ -80,9 +80,9 @@ fn main() {
         files_by_hash_chunk.entry(digest_sum).or_insert_with(Vec::new).push(path);
     }
 
-    let mut files_by_hash = HashMap::with_capacity(1000);
+    let mut files_by_hash = HashMap::new();
 
-    let mut files_by_hash_work = Vec::with_capacity(5000);
+    let mut files_by_hash_work = Vec::with_capacity(50000);
 
     // Now go the whole hog and checksum the entire file
     for (_k, v) in files_by_hash_chunk.iter() {
