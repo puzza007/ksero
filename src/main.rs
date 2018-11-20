@@ -4,7 +4,6 @@ use clap::App;
 use walkdir::{DirEntry, WalkDir};
 use std::fs::File;
 use std::io::Read;
-use std::error::Error;
 use std::collections::HashMap;
 use rayon::prelude::*;
 use twox_hash;
@@ -55,26 +54,25 @@ fn main() {
         }
     }
 
-    let results: Vec<(u64, String)> = files_by_hash_chunk_work.par_iter().map(|entry| {
+    let results: Vec<(u64, String)> = files_by_hash_chunk_work.par_iter().filter_map(|entry| {
         let mut digest = twox_hash::XxHash::with_seed(0);
-        let mut f = match File::open(entry.path()) {
-            Ok(f) => f,
-            Err(e) => {
-                panic!("Failed to open file: {}", e.description());
+        match File::open(entry.path()) {
+            Err(_) => None,
+            Ok(mut f) => {
+                const CHUNK_SIZE: usize = 1024;
+                let mut buffer = [0; CHUNK_SIZE];
+
+                match f.read(&mut buffer) {
+                    Err(_) => None,
+                    Ok(n) => {
+                        digest.write(&buffer[0..n]);
+                        let digest_sum = digest.finish();
+
+                        Some((digest_sum, entry.path().to_str().unwrap().to_string()))
+                    }
+                }
             }
-        };
-        const CHUNK_SIZE: usize = 1024;
-        let mut buffer = [0; CHUNK_SIZE];
-
-        match f.read(&mut buffer) {
-            Err(e) => panic!("Failed to read file: {:?}", e.description()),
-            Ok(n) => digest.write(&buffer[0..n])
-        }
-
-        let digest_sum = digest.finish();
-
-        (digest_sum, entry.path().to_str().unwrap().to_string())
-    }).collect();
+        }}).collect();
 
     for (digest_sum, path) in results.iter() {
         files_by_hash_chunk.entry(digest_sum).or_insert_with(Vec::new).push(path);
@@ -93,29 +91,28 @@ fn main() {
         }
     }
 
-    let final_results: Vec<(u64, String)> = files_by_hash_work.par_iter().map(|path| {
+    let final_results: Vec<(u64, String)> = files_by_hash_work.par_iter().filter_map(|path| {
         let mut digest = twox_hash::XxHash::with_seed(0);
-        let mut f = match File::open(path) {
-            Ok(f) => f,
-            Err(e) => {
-                panic!("Failed to open file: {}", e.description());
-            }
-        };
-        const CHUNK_SIZE: usize = 1024 * 128;
-        let mut buffer = [0; CHUNK_SIZE];
+        match File::open(path) {
+            Err(_) => None,
+            Ok(mut f) => {
+                const CHUNK_SIZE: usize = 1024 * 128;
+                let mut buffer = [0; CHUNK_SIZE];
 
-        // iterate
-        loop {
-            match f.read(&mut buffer) {
-                Err(e) => panic!("Failed to read file: {:?}", e.description()),
-                Ok(0) => break,
-                Ok(n) => digest.write(&buffer[0..n])
+                // iterate
+                loop {
+                    match f.read(&mut buffer) {
+                        Err(_) => return None,
+                        Ok(0) => break,
+                        Ok(n) => digest.write(&buffer[0..n])
+                    }
+                }
+
+                let digest_sum = digest.finish();
+
+                Some((digest_sum, path.to_string()))
             }
         }
-
-        let digest_sum = digest.finish();
-
-        (digest_sum, path.to_string())
     }).collect();
 
     for (digest_sum, path) in final_results.iter() {
