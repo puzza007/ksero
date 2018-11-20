@@ -1,18 +1,17 @@
 extern crate clap;
 
 use clap::App;
-use walkdir::{DirEntry, WalkDir};
-use std::fs::File;
-use std::io::Read;
-use std::collections::HashMap;
 use rayon::prelude::*;
-use twox_hash;
+use std::collections::HashMap;
+use std::fs::File;
 use std::hash::Hasher;
+use std::io::Read;
+use twox_hash;
+use walkdir::{DirEntry, WalkDir};
 
 fn is_empty(entry: &DirEntry) -> bool {
     entry.metadata().map(|m| m.len() == 0).unwrap_or(false)
 }
-
 
 fn main() {
     let mut files_by_size = HashMap::new();
@@ -35,7 +34,10 @@ fn main() {
             {
                 if entry.file_type().is_file() {
                     let file_size = entry.metadata().unwrap().len();
-                    files_by_size.entry(file_size).or_insert_with(Vec::new).push(entry);
+                    files_by_size
+                        .entry(file_size)
+                        .or_insert_with(Vec::new)
+                        .push(entry);
                 }
             }
         }
@@ -54,28 +56,35 @@ fn main() {
         }
     }
 
-    let results: Vec<(u64, String)> = files_by_hash_chunk_work.par_iter().filter_map(|entry| {
-        let mut digest = twox_hash::XxHash::with_seed(0);
-        match File::open(entry.path()) {
-            Err(_) => None,
-            Ok(mut f) => {
-                const CHUNK_SIZE: usize = 1024;
-                let mut buffer = [0; CHUNK_SIZE];
+    let results: Vec<(u64, String)> = files_by_hash_chunk_work
+        .par_iter()
+        .filter_map(|entry| {
+            let mut digest = twox_hash::XxHash::with_seed(0);
+            match File::open(entry.path()) {
+                Err(_) => None,
+                Ok(mut f) => {
+                    const CHUNK_SIZE: usize = 1024;
+                    let mut buffer = [0; CHUNK_SIZE];
 
-                match f.read(&mut buffer) {
-                    Err(_) => None,
-                    Ok(n) => {
-                        digest.write(&buffer[0..n]);
-                        let digest_sum = digest.finish();
+                    match f.read(&mut buffer) {
+                        Err(_) => None,
+                        Ok(n) => {
+                            digest.write(&buffer[0..n]);
+                            let digest_sum = digest.finish();
 
-                        Some((digest_sum, entry.path().to_str().unwrap().to_string()))
+                            Some((digest_sum, entry.path().to_str().unwrap().to_string()))
+                        }
                     }
                 }
             }
-        }}).collect();
+        })
+        .collect();
 
     for (digest_sum, path) in results.iter() {
-        files_by_hash_chunk.entry(digest_sum).or_insert_with(Vec::new).push(path);
+        files_by_hash_chunk
+            .entry(digest_sum)
+            .or_insert_with(Vec::new)
+            .push(path);
     }
 
     let mut files_by_hash = HashMap::new();
@@ -91,32 +100,38 @@ fn main() {
         }
     }
 
-    let final_results: Vec<(u64, String)> = files_by_hash_work.par_iter().filter_map(|path| {
-        let mut digest = twox_hash::XxHash::with_seed(0);
-        match File::open(path) {
-            Err(_) => None,
-            Ok(mut f) => {
-                const CHUNK_SIZE: usize = 1024 * 128;
-                let mut buffer = [0; CHUNK_SIZE];
+    let final_results: Vec<(u64, String)> = files_by_hash_work
+        .par_iter()
+        .filter_map(|path| {
+            let mut digest = twox_hash::XxHash::with_seed(0);
+            match File::open(path) {
+                Err(_) => None,
+                Ok(mut f) => {
+                    const CHUNK_SIZE: usize = 1024 * 128;
+                    let mut buffer = [0; CHUNK_SIZE];
 
-                // iterate
-                loop {
-                    match f.read(&mut buffer) {
-                        Err(_) => return None,
-                        Ok(0) => break,
-                        Ok(n) => digest.write(&buffer[0..n])
+                    // iterate
+                    loop {
+                        match f.read(&mut buffer) {
+                            Err(_) => return None,
+                            Ok(0) => break,
+                            Ok(n) => digest.write(&buffer[0..n]),
+                        }
                     }
+
+                    let digest_sum = digest.finish();
+
+                    Some((digest_sum, path.to_string()))
                 }
-
-                let digest_sum = digest.finish();
-
-                Some((digest_sum, path.to_string()))
             }
-        }
-    }).collect();
+        })
+        .collect();
 
     for (digest_sum, path) in final_results.iter() {
-        files_by_hash.entry(digest_sum).or_insert_with(Vec::new).push(path);
+        files_by_hash
+            .entry(digest_sum)
+            .or_insert_with(Vec::new)
+            .push(path);
     }
 
     for (k, v) in files_by_hash.iter() {
