@@ -24,3 +24,7 @@ FLAGS:
 OPTIONS:
         --directories <DIRECTORY>...    Sets directories to search
 ```
+
+## TODO
+
+Handle hard links by checking inodes
