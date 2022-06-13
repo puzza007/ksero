@@ -1,4 +1,3 @@
-#![feature(duration_as_u128)]
 extern crate clap;
 
 use clap::App;
@@ -10,7 +9,7 @@ use std::hash::Hasher;
 use std::io;
 use std::io::Read;
 use std::time::{SystemTime, UNIX_EPOCH};
-use twox_hash;
+
 use walkdir::{DirEntry, WalkDir};
 
 struct HashWriter<T: Hasher>(T);
@@ -63,7 +62,7 @@ fn main() {
 
     // Find files of duplicate size
     if let Some(directories) = matches.values_of("directories") {
-        for d in directories.into_iter() {
+        for d in directories {
             for entry in WalkDir::new(d)
                 .into_iter()
                 .filter_entry(|e| !is_empty(e))
